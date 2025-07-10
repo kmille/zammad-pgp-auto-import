@@ -1,0 +1,25 @@
+[project]
+name = "zammad-pgp-autoimport-webhook"
+version = "0.1.0"
+description = ""
+authors = [
+    {name = "kmille",email = "github@androidloves.me"}
+]
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "requests (>=2.32.4,<3.0.0)",
+    "flask (>=3.1.1,<4.0.0)",
+    "waitress (>=3.0.2,<4.0.0)",
+]
+
+[tool.poetry]
+packages = [{include = "zammad_pgp_autoimport_webhook", from = "src"}]
+
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.4.1"
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
