@@ -70,7 +70,6 @@ def get_pgp_key_from_attachments(article_data: dict):
 def import_pgp_key(pgp_key: PGPKey, sender_email: str):
     if not pgp_key.has_email(sender_email):
         logger.warning(f"E-Mail contains a PGP not matching with senders email ({sender_email}, {pgp_key})")
-        raise ValueError("nooon")
     elif pgp_key.is_expired:
         logger.warning(f"PGP key is already expired. Not importing it ({pgp_key.expires})")
     else:
