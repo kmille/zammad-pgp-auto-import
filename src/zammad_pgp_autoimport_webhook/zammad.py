@@ -1,6 +1,6 @@
 from zammad_pgp_autoimport_webhook.utils import get_version
 from zammad_pgp_autoimport_webhook.pgp import PGPKey
-from zammad_pgp_autoimport_webhook.exceptions import ZammadError
+from zammad_pgp_autoimport_webhook.exceptions import ZammadError, ZammadPGPKeyAlreadyImportedError
 import requests
 import logging
 import json
@@ -54,9 +54,7 @@ class Zammad(object):
             resp.raise_for_status()
         except requests.exceptions.RequestException as e:
             if isinstance(e, requests.exceptions.HTTPError) and e.response.status_code == 422:
-                logger.info("Key was already imported")
-                logger.debug(f"API error message: {e.response.json()['error_human']}")
-                return
+                raise ZammadPGPKeyAlreadyImportedError(f"Key was already imported. API response: {e.response.json()['error_human']}")
             elif isinstance(e, requests.exceptions.HTTPError):
                 logger.error(f"Zammad API error: {e}")
                 logger.error(f"Request json:\n{json.dumps(data, indent=4)}")

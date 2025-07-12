@@ -19,10 +19,18 @@ class PGPKey(object):
     expires: date
     is_expired: bool
 
-    def __init__(self, raw: str, cli_output: str):
-        self.raw = raw
-        self.meta = cli_output
-        for line in cli_output.splitlines():
+    def __init__(self, key_data: str):
+        self.raw = key_data
+        try:
+            p = subprocess.run(["gpg", "--show-keys"], input=key_data.encode(), capture_output=True, check=True)
+            self.meta = p.stdout.decode()
+        except FileNotFoundError as e:
+            raise PGPError(f"Could not find gpg binary: {e}")
+        except subprocess.CalledProcessError as e:
+            logging.error(f"Content of the PGP key\n: {key_data}")
+            raise PGPError(f"Could not decode pgp key: {e.stderr.decode()}")
+
+        for line in self.meta.splitlines():
             if line.startswith("uid"):
                 if result := re.search(r'<(.*)>', line):
                     self.emails.append(result.group(1))
@@ -42,25 +50,12 @@ class PGPKey(object):
 class PGPHandler:
 
     @staticmethod
-    def parse_pgp_key(key_data: str) -> PGPKey:
-        try:
-            logger.info("TODO INPUT VALIDATION")
-            p = subprocess.run("gpg", input=key_data.encode(), capture_output=True, check=True)
-            logging.debug(f"Parsed attached PGP key:\n{p.stdout.decode()}")
-            return PGPKey(key_data, p.stdout.decode())
-        except FileNotFoundError as e:
-            raise PGPError(f"Could not find pgp binary: {e}")
-        except subprocess.CalledProcessError as e:
-            logging.error(f"Content of the attachment\n: {key_data}")
-            raise PGPError(f"Could not decode pgp key: {e.stderr.decode()}")
-
-    @staticmethod
     def search_pgp_key(email: str) -> PGPKey:
         logging.debug(f"Using keyserver {KEY_SERVER} to find a PGP key for {email}")
         try:
             resp = requests.get(KEY_SERVER + f"/pks/lookup?op=get&options=mr&search={email}")
             resp.raise_for_status()
-            return PGPHandler.parse_pgp_key(resp.text)
+            return PGPKey(resp.text)
         except requests.exceptions.HTTPError as e:
             if e.response.status_code == 400:
                 logger.debug(f"API error message: {e.response.text}")

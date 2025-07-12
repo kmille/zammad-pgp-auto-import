@@ -2,17 +2,18 @@ from flask import Flask, request
 from flask_basicauth import BasicAuth
 import json
 import waitress
+import werkzeug
 import logging
 
 from zammad_pgp_autoimport_webhook.pgp import PGPHandler, PGPKey
 from zammad_pgp_autoimport_webhook.zammad import Zammad
 from zammad_pgp_autoimport_webhook.utils import get_version, load_envs
-from zammad_pgp_autoimport_webhook.exceptions import PGPImportError, NotFoundOnKeyserverError
+from zammad_pgp_autoimport_webhook.exceptions import PGPImportError, NotFoundOnKeyserverError, ZammadPGPKeyAlreadyImportedError
 
 #LOG_FORMAT = "[%(asctime)s %(filename)s:%(lineno)s %(funcName)s() %(levelname)s] %(message)s"
 LOG_FORMAT = "[%(asctime)s %(levelname)5s] %(message)s"
 logging.basicConfig(format=LOG_FORMAT,
-                    level=logging.DEBUG)
+                    level=logging.INFO)
 
 logging.getLogger("urllib3").setLevel(logging.WARNING)
 
@@ -63,7 +64,7 @@ def get_pgp_key_from_attachments(article_data: dict):
             logger.debug("Seems like a PGP key is attached to this email")
             z = Zammad(ZAMMAD_BASE_URL, ZAMMAD_TOKEN)
             key_data = z.download_attachment(attachment["url"])
-            return PGPHandler.parse_pgp_key(key_data)
+            return PGPKey(key_data)
 
 
 def import_pgp_key(pgp_key: PGPKey, sender_email: str):
@@ -74,8 +75,12 @@ def import_pgp_key(pgp_key: PGPKey, sender_email: str):
         logger.warning(f"PGP key is already expired. Not importing it ({pgp_key.expires})")
     else:
         z = Zammad(ZAMMAD_BASE_URL, ZAMMAD_TOKEN)
-        z.import_pgp_key(pgp_key)
-        logger.info(f"Successfully imported pgp key ({pgp_key.fingerprint}) for email {sender_email}")
+        try:
+            z.import_pgp_key(pgp_key)
+        except ZammadPGPKeyAlreadyImportedError as e:
+            logger.info(e)
+        else:
+            logger.info(f"Successfully imported pgp key ({pgp_key.fingerprint}) for email {sender_email}")
 
 
 def get_key_from_keyserver(email: str) -> PGPKey:
@@ -88,11 +93,11 @@ def get_key_from_keyserver(email: str) -> PGPKey:
         return None
 
 
-@app.route("/zammad/webhook/pgp", methods=["POST"])
+@app.route("/api/zammad/pgp", methods=["POST"])
 def webhook_new_ticket():
     global error_counter
     try:
-        data = request.json
+        data = request.get_json(force=True)
         sender_email = data["ticket"]["created_by"]["email"]
         article_data = data['article']
 
@@ -106,15 +111,19 @@ def webhook_new_ticket():
             logger.info("Could not import PGP key. Key was not attached to mail nor a key was found on the keyserver")
         else:
             import_pgp_key(pgp_key, sender_email)
+    except (werkzeug.exceptions.BadRequest, KeyError) as e:
+        logger.exception(e)
+        error_counter += 1
+        return {"status": 'failed', 'reason': 'invalid client request'}, 500
     except PGPImportError as e:
         logger.error(e)
         error_counter += 1
-        return {"status": 'failed'}, 500
+        return {"status": 'failed', 'reason': 'PGP/API error'}, 500
     except Exception as e:
         logger.error(f"Unhandled exception occured: {e}")
         logger.exception(e)
         error_counter += 1
-        return {"status": "failed"}, 500
+        return {"status": "failed", 'reason': 'unhandled exception'}, 500
     else:
         return {"status": "ok"}
 
@@ -128,7 +137,7 @@ def status():
 
 
 def main():
-    logger.info(f"Starting webhook backend: {LISTEN_HOST}:{LISTEN_PORT} (version {get_version()})")
+    logger.info(f"Starting webhook backend on {LISTEN_HOST}:{LISTEN_PORT} (version {get_version()}, debug={DEBUG == '1'})")
     if __name__ == '__main__':
         app.run(host=LISTEN_HOST, port=LISTEN_PORT, debug=True)
     else:

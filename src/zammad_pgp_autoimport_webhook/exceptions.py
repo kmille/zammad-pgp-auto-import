@@ -13,3 +13,7 @@ class NotFoundOnKeyserverError(PGPImportError):
 
 class ZammadError(PGPImportError):
     pass
+
+
+class ZammadPGPKeyAlreadyImportedError(PGPImportError):
+    pass
