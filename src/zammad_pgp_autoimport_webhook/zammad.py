@@ -4,6 +4,7 @@ from zammad_pgp_autoimport_webhook.exceptions import ZammadError, ZammadPGPKeyAl
 import requests
 import logging
 import json
+from typing import Any
 
 
 logger = logging.getLogger(__name__)
@@ -44,7 +45,7 @@ class Zammad(object):
                 raise ZammadError(f"Could not download attachment from Zammad: {e.response.json()['error_human']}")
             raise ZammadError(f"Could not download attachment from Zammad: {e}")
 
-    def import_pgp_key(self, pgp_key: PGPKey):
+    def import_pgp_key(self, pgp_key: PGPKey) -> None:
         logger.debug("Importing PGP key using Zammad API")
         data = {'file': '',
                 'key': pgp_key.raw,
@@ -61,7 +62,7 @@ class Zammad(object):
                 raise ZammadError(f"Could not import PGP key: {e.response.json()['error_human']}")
             raise ZammadError(f"Could not import PGP key: {e}")
 
-    def delete_pgp_key(self, email: str):
+    def delete_pgp_key(self, email: str) -> None:
         logger.debug("Deleting PGP key using Zammad API")
         try:
             all_imported_keys = self.get_all_imported_pgp_keys()

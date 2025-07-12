@@ -4,14 +4,14 @@ import os
 import sys
 
 
-def get_version():
+def get_version() -> str:
     try:
         return importlib.metadata.version(__package__)
     except importlib.metadata.PackageNotFoundError:
         return 'development'
 
 
-def load_envs():
+def load_envs() -> list:
     envs = []
     required_envs = ["ZAMMAD_BASE_URL", "ZAMMAD_TOKEN", "BASIC_AUTH_USER", "BASIC_AUTH_PASSWORD"]
     for required_env in required_envs:

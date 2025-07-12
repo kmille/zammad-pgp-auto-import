@@ -4,6 +4,7 @@ import json
 import waitress
 import werkzeug
 import logging
+from typing import Optional
 
 from zammad_pgp_autoimport_webhook.pgp import PGPHandler, PGPKey
 from zammad_pgp_autoimport_webhook.zammad import Zammad
@@ -35,7 +36,7 @@ basic_auth = BasicAuth(app)
 error_counter = 0
 
 
-def is_encrypted_mail(article_data) -> bool:
+def is_encrypted_mail(article_data: dict) -> bool:
     preferences = article_data["preferences"]
     if "security" not in preferences:
         print("E-Mail is not encrypted")
@@ -54,7 +55,7 @@ def is_encrypted_mail(article_data) -> bool:
         return False
 
 
-def get_pgp_key_from_attachments(article_data: dict):
+def get_pgp_key_from_attachments(article_data: dict) -> Optional[PGPKey]:
     # this only supports a single PGP key
     if len(article_data["attachments"]) == 0:
         logger.debug("This ticket does not have any attachments")
@@ -65,9 +66,10 @@ def get_pgp_key_from_attachments(article_data: dict):
             z = Zammad(ZAMMAD_BASE_URL, ZAMMAD_TOKEN)
             key_data = z.download_attachment(attachment["url"])
             return PGPKey(key_data)
+    return None
 
 
-def import_pgp_key(pgp_key: PGPKey, sender_email: str):
+def import_pgp_key(pgp_key: PGPKey, sender_email: str) -> None:
     if not pgp_key.has_email(sender_email):
         logger.warning(f"E-Mail contains a PGP not matching with senders email ({sender_email}, {pgp_key})")
     elif pgp_key.is_expired:
@@ -82,7 +84,7 @@ def import_pgp_key(pgp_key: PGPKey, sender_email: str):
             logger.info(f"Successfully imported pgp key ({pgp_key.fingerprint}) for email {sender_email}")
 
 
-def get_key_from_keyserver(email: str) -> PGPKey:
+def get_key_from_keyserver(email: str) -> Optional[PGPKey]:
     try:
         pgp_key = PGPHandler.search_pgp_key(email)
         logger.info("Successfully found PGP key using a keyserver")
@@ -93,7 +95,7 @@ def get_key_from_keyserver(email: str) -> PGPKey:
 
 
 @app.route("/api/zammad/pgp", methods=["POST"])
-def webhook_new_ticket():
+def webhook_new_ticket() -> tuple[dict[str, str], int]:
     global error_counter
     try:
         data = request.get_json(force=True)
@@ -124,18 +126,18 @@ def webhook_new_ticket():
         error_counter += 1
         return {"status": "failed", 'reason': 'unhandled exception'}, 500
     else:
-        return {"status": "ok"}
+        return {"status": "ok"}, 200
 
 
 @app.route("/status")
-def status():
+def status() -> dict:
     if error_counter == 0:
         return {"status": "ok"}
     else:
         return {"status": "fail"}
 
 
-def main():
+def main() -> None:
     logger.info(f"Starting webhook backend on {LISTEN_HOST}:{LISTEN_PORT} (version {get_version()}, debug={DEBUG == '1'})")
     if __name__ == '__main__':
         app.run(host=LISTEN_HOST, port=LISTEN_PORT, debug=True)

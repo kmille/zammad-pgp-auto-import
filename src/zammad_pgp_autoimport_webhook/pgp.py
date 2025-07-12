@@ -34,8 +34,8 @@ class PGPKey(object):
             if line.startswith("uid"):
                 if result := re.search(r'<(.*)>', line):
                     self.emails.append(result.group(1))
-            elif re.search(r'[0-9A-F]{40}', line):
-                self.fingerprint = re.search(r'[0-9A-F]{40}', line)[0]
+            elif result := re.search(r'[0-9A-F]{40}', line):
+                self.fingerprint = result[0]
             elif result := re.search(r'expires: (\d{4}-\d{2}-\d{2})', line):
                 self.expires = datetime.strptime(result.group(1), "%Y-%m-%d").date()
                 self.is_expired = datetime.now().date() > self.expires
@@ -43,7 +43,7 @@ class PGPKey(object):
     def has_email(self, email: str) -> bool:
         return email in self.emails
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"PGPKey (emails={','.join(self.emails)} fingerprint={self.fingerprint}, expires={self.expires}))"
 
 

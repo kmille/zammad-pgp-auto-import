@@ -12,6 +12,7 @@ dependencies = [
     "flask (>=3.1.1,<4.0.0)",
     "waitress (>=3.0.2,<4.0.0)",
     "flask-basicauth (>=0.2.0,<0.3.0)",
+    "mypy (>=1.16.1,<2.0.0)",
 ]
 
 [tool.poetry]
@@ -20,6 +21,8 @@ packages = [{include = "zammad_pgp_autoimport_webhook", from = "src"}]
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.4.1"
+types-requests = "^2.32.4.20250611"
+types-waitress = "^3.0.1.20241117"
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
