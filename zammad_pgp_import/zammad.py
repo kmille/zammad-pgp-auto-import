@@ -1,11 +1,10 @@
-from zammad_pgp_autoimport_webhook.utils import get_version
-from zammad_pgp_autoimport_webhook.pgp import PGPKey
-from zammad_pgp_autoimport_webhook.exceptions import ZammadError, ZammadPGPKeyAlreadyImportedError
-import requests
 import logging
 import json
-from typing import Any
+import requests
 
+from zammad_pgp_import.utils import get_version
+from zammad_pgp_import.pgp import PGPKey
+from zammad_pgp_import.exceptions import ZammadError, ZammadPGPKeyAlreadyImportedError
 
 logger = logging.getLogger(__name__)
 

@@ -1,5 +1,5 @@
 [project]
-name = "zammad-pgp-autoimport-webhook"
+name = "zammad-pgp-import"
 version = "0.1.0"
 description = ""
 authors = [
@@ -16,7 +16,7 @@ dependencies = [
 ]
 
 [tool.poetry]
-packages = [{include = "zammad_pgp_autoimport_webhook", from = "src"}]
+packages = [{include = "zammad_pgp_import"}]
 
 
 [tool.poetry.group.dev.dependencies]
@@ -29,4 +29,4 @@ requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.poetry.scripts]
-zammad-pgp-autoimport-webhook = 'zammad_pgp_autoimport_webhook.__init__:main'
+zammad-pgp-autoimport-webhook = 'zammad_pgp_import.__init__:main'

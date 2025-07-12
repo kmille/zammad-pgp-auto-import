@@ -1,10 +1,11 @@
-import subprocess
-from datetime import datetime, date
+import logging
 import re
 import os
-import logging
+import subprocess
+from datetime import datetime, date
 import requests
-from zammad_pgp_autoimport_webhook.exceptions import PGPError, NotFoundOnKeyserverError
+
+from zammad_pgp_import.exceptions import PGPError, NotFoundOnKeyserverError
 
 logger = logging.getLogger(__name__)
 

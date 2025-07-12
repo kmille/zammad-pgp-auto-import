@@ -1,17 +1,16 @@
+import logging
+import json
+from typing import Optional
 from flask import Flask, request
 from flask_basicauth import BasicAuth
-import json
 import waitress
 import werkzeug
-import logging
-from typing import Optional
 
-from zammad_pgp_autoimport_webhook.pgp import PGPHandler, PGPKey
-from zammad_pgp_autoimport_webhook.zammad import Zammad
-from zammad_pgp_autoimport_webhook.utils import get_version, load_envs
-from zammad_pgp_autoimport_webhook.exceptions import PGPImportError, NotFoundOnKeyserverError, ZammadPGPKeyAlreadyImportedError
+from zammad_pgp_import.utils import get_version, load_envs
+from zammad_pgp_import.exceptions import PGPImportError, NotFoundOnKeyserverError, ZammadPGPKeyAlreadyImportedError
+from zammad_pgp_import.zammad import Zammad
+from zammad_pgp_import.pgp import PGPHandler, PGPKey
 
-#LOG_FORMAT = "[%(asctime)s %(filename)s:%(lineno)s %(funcName)s() %(levelname)s] %(message)s"
 LOG_FORMAT = "[%(asctime)s %(levelname)5s] %(message)s"
 logging.basicConfig(format=LOG_FORMAT,
                     level=logging.INFO)

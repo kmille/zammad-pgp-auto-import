@@ -1,7 +1,7 @@
-import importlib
 import logging
 import os
 import sys
+import importlib
 
 
 def get_version() -> str:
