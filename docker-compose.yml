@@ -1,0 +1,19 @@
+services:
+  zammad-pgp-import:
+    build: .
+    #image: 
+    ports:
+      - 80:22000
+    environment:
+      DEBUG: "1"
+      BASIC_AUTH_USER: "test"
+      BASIC_AUTH_PASSWORD: "test"
+      ZAMMAD_BASE_URL: "https://tickets.mydomain.org"
+      ZAMMAD_TOKEN: "api auth token"
+    security_opt:
+      - no-new-privileges
+    cap_drop:
+      - ALL
+
+
+
