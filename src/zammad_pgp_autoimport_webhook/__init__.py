@@ -1,75 +1,37 @@
 from flask import Flask, request
-from pathlib import Path
-import requests
-from requests import Session
+from flask_basicauth import BasicAuth
 import json
-from datetime import datetime
 import waitress
 import logging
 
-from zammad_pgp_autoimport_webhook.pgp import PGPHandler
+from zammad_pgp_autoimport_webhook.pgp import PGPHandler, PGPKey
 from zammad_pgp_autoimport_webhook.zammad import Zammad
 from zammad_pgp_autoimport_webhook.utils import get_version, load_envs
+from zammad_pgp_autoimport_webhook.exceptions import PGPImportError, NotFoundOnKeyserverError
 
 #LOG_FORMAT = "[%(asctime)s %(filename)s:%(lineno)s %(funcName)s() %(levelname)s] %(message)s"
-LOG_FORMAT = "[%(asctime)s %(levelname)s] %(message)s"
+LOG_FORMAT = "[%(asctime)s %(levelname)5s] %(message)s"
 logging.basicConfig(format=LOG_FORMAT,
                     level=logging.DEBUG)
 
-#logging.getLogger("requests").setLevel(logging.WARNING)
+logging.getLogger("urllib3").setLevel(logging.WARNING)
+
+
 logger = logging.getLogger(__name__)
 
-ZAMMAD_BASE_URL, ZAMMAD_TOKEN, LISTEN_HOST, LISTEN_PORT, DEBUG = load_envs()
+(ZAMMAD_BASE_URL, ZAMMAD_TOKEN, BASIC_AUTH_USER, BASIC_AUTH_PASSWORD,
+    LISTEN_HOST, LISTEN_PORT, DEBUG) = load_envs()
 
 if DEBUG == 1:
     logger.setLevel(logging.DEBUG)
 
 app = Flask(__name__)
+app.config['BASIC_AUTH_USERNAME'] = BASIC_AUTH_USER
+app.config['BASIC_AUTH_PASSWORD'] = BASIC_AUTH_PASSWORD
+app.config['BASIC_AUTH_FORCE'] = True # protect all endpoints
+basic_auth = BasicAuth(app)
 
-
-"""
-TODOS
-- check if key is really a pgp key (api changen) - lädt gerade von File
-- basic auth
-- tests
-- input validation api endpoint
-"""
-
-
-def handle_attachments(sender_email, article_data):
-    key_data = get_pgp_key_from_attachments(article_data)
-    if not key_data:
-        return
-    pgp_key = PGPHandler.parse_pgp_key(key_data)
-    if not pgp_key:
-        return
-    if pgp_key.email != sender_email:
-        logger.info(f"E-Mail contains a PGP not matching with senders email ({sender_email}, {pgp_key.email}")
-    else:
-        z = Zammad(ZAMMAD_BASE_URL, ZAMMAD_TOKEN)
-        known_keys = z.get_all_imported_pgp_keys()
-        if pgp_key.fingerprint in known_keys:
-            logger.info(f"{pgp_key} already imported")
-        else:
-            z.import_pgp_key(key_data)
-
-
-def get_pgp_key_from_attachments(article_data):
-    # this only supports a single PGP key
-    if len(article_data["attachments"]) == 0:
-        logger.debug("This ticket does not have any attachments")
-        return None
-    for attachment in article_data["attachments"]:
-        if "application/pgp-keys" in attachment["preferences"]["Content-Type"]:
-            logger.debug("Seems like a PGP key is attached in this email")
-            try:
-                z = Zammad(ZAMMAD_BASE_URL, ZAMMAD_TOKEN)
-                resp = z.download_attachment(attachment["url"])
-                resp.raise_for_status()
-                return resp.text
-            except requests.exceptions.RequestException as e:
-                print(f"Could not download PGP via Zammad API: {e}")
-                return None
+error_counter = 0
 
 
 def is_encrypted_mail(article_data) -> bool:
@@ -91,22 +53,78 @@ def is_encrypted_mail(article_data) -> bool:
         return False
 
 
+def get_pgp_key_from_attachments(article_data: dict):
+    # this only supports a single PGP key
+    if len(article_data["attachments"]) == 0:
+        logger.debug("This ticket does not have any attachments")
+        return None
+    for attachment in article_data["attachments"]:
+        if "application/pgp-keys" in attachment["preferences"]["Content-Type"]:
+            logger.debug("Seems like a PGP key is attached to this email")
+            z = Zammad(ZAMMAD_BASE_URL, ZAMMAD_TOKEN)
+            key_data = z.download_attachment(attachment["url"])
+            return PGPHandler.parse_pgp_key(key_data)
+
+
+def import_pgp_key(pgp_key: PGPKey, sender_email: str):
+    if not pgp_key.has_email(sender_email):
+        logger.warning(f"E-Mail contains a PGP not matching with senders email ({sender_email}, {pgp_key})")
+        raise ValueError("nooon")
+    elif pgp_key.is_expired:
+        logger.warning(f"PGP key is already expired. Not importing it ({pgp_key.expires})")
+    else:
+        z = Zammad(ZAMMAD_BASE_URL, ZAMMAD_TOKEN)
+        z.import_pgp_key(pgp_key)
+        logger.info(f"Successfully imported pgp key ({pgp_key.fingerprint}) for email {sender_email}")
+
+
+def get_key_from_keyserver(email: str) -> PGPKey:
+    try:
+        pgp_key = PGPHandler.search_pgp_key(email)
+        logger.info("Successfully found PGP key using a keyserver")
+        return pgp_key
+    except NotFoundOnKeyserverError as e:
+        logging.error(e)
+        return None
+
+
 @app.route("/zammad/webhook/pgp", methods=["POST"])
 def webhook_new_ticket():
-    with open(f"request-{datetime.now()}.json", "w") as f:
-        json.dump(request.json, f, indent=4)
+    global error_counter
+    try:
+        data = request.json
+        sender_email = data["ticket"]["created_by"]["email"]
+        article_data = data['article']
 
-    data = request.json
-    sender_email = data["ticket"]["created_by"]["email"]
-    #body = data["article"]["body"]
+        is_encrypted = is_encrypted_mail(article_data)
+        logger.info(f"Received a new ticket: {ZAMMAD_BASE_URL}/#ticket/zoom/{data['ticket']['id']} (from={sender_email}, is_encrypted={is_encrypted})")
 
-    handle_attachments(sender_email, data["article"])
-    return {"status": "ok"}
+        pgp_key = get_pgp_key_from_attachments(article_data)
+        if not pgp_key:
+            pgp_key = get_key_from_keyserver(sender_email)
+        if not pgp_key:
+            logger.info("Could not import PGP key. Key was not attached to mail nor a key was found on the keyserver")
+        else:
+            import_pgp_key(pgp_key, sender_email)
+    except PGPImportError as e:
+        logger.error(e)
+        error_counter += 1
+        return {"status": 'failed'}, 500
+    except Exception as e:
+        logger.error(f"Unhandled exception occured: {e}")
+        logger.exception(e)
+        error_counter += 1
+        return {"status": "failed"}, 500
+    else:
+        return {"status": "ok"}
 
 
 @app.route("/status")
 def status():
-    return {"status": "ok"}
+    if error_counter == 0:
+        return {"status": "ok"}
+    else:
+        return {"status": "fail"}
 
 
 def main():

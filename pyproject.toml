@@ -11,6 +11,7 @@ dependencies = [
     "requests (>=2.32.4,<3.0.0)",
     "flask (>=3.1.1,<4.0.0)",
     "waitress (>=3.0.2,<4.0.0)",
+    "flask-basicauth (>=0.2.0,<0.3.0)",
 ]
 
 [tool.poetry]
@@ -23,3 +24,6 @@ pytest = "^8.4.1"
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.scripts]
+pgp-webhook = 'zammad_pgp_autoimport_webhook.__init__:main'

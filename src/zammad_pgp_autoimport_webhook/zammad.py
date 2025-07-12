@@ -1,4 +1,6 @@
 from zammad_pgp_autoimport_webhook.utils import get_version
+from zammad_pgp_autoimport_webhook.pgp import PGPKey
+from zammad_pgp_autoimport_webhook.exceptions import ZammadError
 import requests
 import logging
 import json
@@ -8,8 +10,8 @@ logger = logging.getLogger(__name__)
 
 
 class Zammad(object):
-    session = requests.Session
-    #zammad_base: str
+    session: requests.Session
+    bsae_url: str
 
     def __init__(self, zammad_base_url: str, auth_token: str):
         self.base_url = zammad_base_url
@@ -17,37 +19,60 @@ class Zammad(object):
         self.session.headers.update({"Authorization": f"Token token={auth_token}",
                                      "User-Agent": f"PGP auto-import webhook {get_version()}"})
 
-    def get_all_imported_pgp_keys(self):
-        req = self.session.get(self.base_url + "/api/v1/integration/pgp/key")
-        req.raise_for_status()
-        #return [k["fingerprint"] for k in req.json()]
-        return req.json()
+    def get_all_imported_pgp_keys(self) -> list:
+        """
+        This is not used any more.  We just import and do net check if the key already exists before
+        """
+        logger.debug("Getting all imported PGP keys using Zammad API")
+        try:
+            req = self.session.get(self.base_url + "/api/v1/integration/pgp/key")
+            req.raise_for_status()
+            return req.json()
+        except requests.exceptions.RequestException as e:
+            raise ZammadError(f"Could not get all imported PGP keys from Zammad: {e}")
 
-    def download_attachment(self, url: str):
-        return self.session.get(url)
-
-    def delete_pgp_key(self, email: str):
-        all_imported_keys = self.get_all_imported_pgp_keys()
-        matching_keys = list(filter(lambda x: x['email_addresses'][0].lower() == email.lower(), all_imported_keys))
-        if len(matching_keys) == 0:
-            logger.warning(f"Could find a PGP key with e-mail {email}")
-            print(f"Could find a PGP key with e-mail {email}")
-        else:
-            resp = self.session.delete(self.base_url + f"/api/v1/integration/pgp/key/{matching_keys[0]['id']}")
+    def download_attachment(self, url: str) -> str:
+        logger.debug("Downloading ticket attachment using Zammad API")
+        try:
+            resp = self.session.get(url)
             resp.raise_for_status()
-            print(resp.json())
-            print("KEY DELETED!")
+            logger.debug("Successfully downloaded email attachment")
+            return resp.text
+        except requests.exceptions.RequestException as e:
+            if isinstance(e, requests.exceptions.HTTPError):
+                logger.error(f"Zammad API error: {e}")
+                raise ZammadError(f"Could not download attachment from Zammad: {e.response.json()['error_human']}")
+            raise ZammadError(f"Could not download attachment from Zammad: {e}")
 
-    def import_pgp_key(self, key_data: str):
+    def import_pgp_key(self, pgp_key: PGPKey):
+        logger.debug("Importing PGP key using Zammad API")
         data = {'file': '',
-                'key': key_data,
+                'key': pgp_key.raw,
                 'passphrase': ""}
         try:
             resp = self.session.post(self.base_url + "/api/v1/integration/pgp/key", json=data)
             resp.raise_for_status()
-            logger.info("Successfully imported pgp key")
-            logger.debug(resp.json())
-            print("KEY UPLOADED")
         except requests.exceptions.RequestException as e:
-            logger.error(f"Could not import PGP: {e.response.json()['error']}")
-            logger.error(f"Request json:\n{json.dumps(data, indent=4)}")
+            if isinstance(e, requests.exceptions.HTTPError) and e.response.status_code == 422:
+                logger.info("Key was already imported")
+                logger.debug(f"API error message: {e.response.json()['error_human']}")
+                return
+            elif isinstance(e, requests.exceptions.HTTPError):
+                logger.error(f"Zammad API error: {e}")
+                logger.error(f"Request json:\n{json.dumps(data, indent=4)}")
+                raise ZammadError(f"Could not import PGP key: {e.response.json()['error_human']}")
+            raise ZammadError(f"Could not import PGP key: {e}")
+
+    def delete_pgp_key(self, email: str):
+        logger.debug("Deleting PGP key using Zammad API")
+        try:
+            all_imported_keys = self.get_all_imported_pgp_keys()
+            matching_keys = list(filter(lambda x: x['email_addresses'][0].lower() == email.lower(), all_imported_keys))
+            if len(matching_keys) == 0:
+                logger.warning(f"Could find a PGP key with e-mail {email}")
+            else:
+                resp = self.session.delete(self.base_url + f"/api/v1/integration/pgp/key/{matching_keys[0]['id']}")
+                resp.raise_for_status()
+                logger.info("Successfully deleted PGP in Zammad")
+        except requests.exceptions.RequestException as e:
+            logger.warning(f"Could not delete PGP key in Zammad: {e}")
