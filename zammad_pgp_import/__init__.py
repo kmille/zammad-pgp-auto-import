@@ -38,19 +38,18 @@ error_counter = 0
 def is_encrypted_mail(article_data: dict) -> bool:
     preferences = article_data["preferences"]
     if "security" not in preferences:
-        print("E-Mail is not encrypted")
         return False
 
     security = preferences["security"]
     if security.get("type", "") != "PGP":
-        print("E-Mail seems encrypted, but not with PGP")
+        logger.debug("Email seems encrypted, but not with PGP")
         return False
 
     try:
         return security["encryption"]["success"] is True
     except KeyError as e:
-        print(f"Could not check if mail is PGP encrypted: {e}")
-        print(json.dumps(security, indent=4))
+        logger.error(f"Could not check if mail is PGP encrypted: {e}")
+        logger.error(json.dumps(article_data, indent=4))
         return False
 
 

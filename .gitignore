@@ -4,3 +4,4 @@ secrets.source
 *.json
 TODOs
 docker-compose.override.yml
+release.sh
