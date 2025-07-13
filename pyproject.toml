@@ -1,6 +1,6 @@
 [project]
 name = "zammad-pgp-import"
-version = "0.1.0"
+version = "0.1.1a0"
 description = ""
 authors = [
     {name = "kmille",email = "github@androidloves.me"}
@@ -23,6 +23,8 @@ packages = [{include = "zammad_pgp_import"}]
 pytest = "^8.4.1"
 types-requests = "^2.32.4.20250611"
 types-waitress = "^3.0.1.20241117"
+requests-mock = "^1.12.1"
+pytest-flask = "^1.3.0"
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
