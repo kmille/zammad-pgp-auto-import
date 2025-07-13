@@ -1,6 +1,6 @@
-#from zammad_pgp_autoimport_webhook.pgp import get_key_from_public_server, get_pgp_key_from_file, get_all_imported_pgp_keys
-from zammad_pgp_autoimport_webhook.pgp import PGPKey, PGPHandler
-from zammad_pgp_autoimport_webhook.exceptions import PGPError
+#from zammad_pgp_import.pgp import get_key_from_public_server, get_pgp_key_from_file, get_all_imported_pgp_keys
+from zammad_pgp_import.pgp import PGPKey, PGPHandler
+from zammad_pgp_import.exceptions import PGPError
 from pathlib import Path
 import pytest
 
@@ -17,6 +17,8 @@ class TestPGPHandler:
         assert set(key.emails) == {'jelle@archlinux.org', 'jelle@vdwaa.nl', 'jvanderwaa@redhat.com'}
         assert key.has_email(test_key_email)
         assert not key.has_email('nooo@abc.de')
+
+    # TODO: handle different formats of expires...
 
     def test_parse_invalid_pgp_key(self):
         key_data = "this is not a PGP key"

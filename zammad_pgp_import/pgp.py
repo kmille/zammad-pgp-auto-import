@@ -2,7 +2,7 @@ import logging
 import re
 import os
 import subprocess
-from datetime import datetime, date
+# from datetime import datetime, date
 import requests
 
 from zammad_pgp_import.exceptions import PGPError, NotFoundOnKeyserverError
@@ -17,7 +17,7 @@ class PGPKey(object):
     meta: str
     emails: list[str] = []
     fingerprint: str
-    expires: date
+    # expires: date
     is_expired: bool
 
     def __init__(self, key_data: str):
@@ -37,15 +37,22 @@ class PGPKey(object):
                     self.emails.append(result.group(1))
             elif result := re.search(r'[0-9A-F]{40}', line):
                 self.fingerprint = result[0]
-            elif result := re.search(r'expires: (\d{4}-\d{2}-\d{2})', line):
-                self.expires = datetime.strptime(result.group(1), "%Y-%m-%d").date()
-                self.is_expired = datetime.now().date() > self.expires
+            # elif result := re.search(r'expires: (\d{4}-\d{2}-\d{2})', line):
+            #     self.expires = datetime.strptime(result.group(1), "%Y-%m-%d").date()
+            #     self.is_expired = datetime.now().date() > self.expires
+
+        #  TODO: test if everything is set up
+        # breakpoint()
+        # if not all([self.fingerprint, self.expires]):
+        #     raise PGPError("Could not parse PGP key data")
+        self.is_expired = False
 
     def has_email(self, email: str) -> bool:
         return email in self.emails
 
     def __repr__(self) -> str:
-        return f"PGPKey (emails={','.join(self.emails)} fingerprint={self.fingerprint}, expires={self.expires}))"
+        # return f"PGPKey (emails={','.join(self.emails)} fingerprint={self.fingerprint}, expires={self.expires}))"
+        return f"PGPKey (emails={','.join(self.emails)} fingerprint={self.fingerprint}"
 
 
 class PGPHandler:
@@ -60,8 +67,8 @@ class PGPHandler:
         except requests.exceptions.HTTPError as e:
             if e.response.status_code == 400:
                 logger.debug(f"API error message: {e.response.text}")
-                raise NotFoundOnKeyserverError(f"Could find a PGP key for {email} using keyserver {KEY_SERVER}")
+                raise NotFoundOnKeyserverError(f"Could not find a PGP key for {email} using keyserver {KEY_SERVER}")
             else:
                 raise PGPError(f"Could find PGP key on {KEY_SERVER}: {e.response.text}")
         except requests.exceptions.RequestException as e:
-            raise PGPError(f"Could find PGP key on {KEY_SERVER}: {e}")
+            raise PGPError(f"Could not get PGP key: {e}")

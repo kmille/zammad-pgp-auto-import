@@ -23,13 +23,13 @@ logger = logging.getLogger(__name__)
 (ZAMMAD_BASE_URL, ZAMMAD_TOKEN, BASIC_AUTH_USER, BASIC_AUTH_PASSWORD,
     LISTEN_HOST, LISTEN_PORT, DEBUG) = load_envs()
 
-if DEBUG == 1:
+if DEBUG == "1":
     logger.setLevel(logging.DEBUG)
 
 app = Flask(__name__)
 app.config['BASIC_AUTH_USERNAME'] = BASIC_AUTH_USER
 app.config['BASIC_AUTH_PASSWORD'] = BASIC_AUTH_PASSWORD
-app.config['BASIC_AUTH_FORCE'] = True # protect all endpoints
+app.config['BASIC_AUTH_FORCE'] = True  # protect all endpoints
 basic_auth = BasicAuth(app)
 
 error_counter = 0
@@ -71,7 +71,8 @@ def import_pgp_key(pgp_key: PGPKey, sender_email: str) -> None:
     if not pgp_key.has_email(sender_email):
         logger.warning(f"E-Mail contains a PGP not matching with senders email ({sender_email}, {pgp_key})")
     elif pgp_key.is_expired:
-        logger.warning(f"PGP key is already expired. Not importing it ({pgp_key.expires})")
+        pass
+        # logger.warning(f"PGP key is already expired. Not importing it ({pgp_key.expires})")
     else:
         z = Zammad(ZAMMAD_BASE_URL, ZAMMAD_TOKEN)
         try:
@@ -101,15 +102,16 @@ def webhook_new_ticket() -> tuple[dict[str, str], int]:
         article_data = data['article']
 
         is_encrypted = is_encrypted_mail(article_data)
-        logger.info(f"Received a new ticket: {ZAMMAD_BASE_URL}/#ticket/zoom/{data['ticket']['id']} (from={sender_email}, is_encrypted={is_encrypted})")
+        logger.info(f"Received a new Ticket: {ZAMMAD_BASE_URL}/#ticket/zoom/{data['ticket']['id']} (from={sender_email}, is_encrypted={is_encrypted})")
 
         pgp_key = get_pgp_key_from_attachments(article_data)
-        if not pgp_key:
+        if not pgp_key and is_encrypted:
             pgp_key = get_key_from_keyserver(sender_email)
-        if not pgp_key:
-            logger.info("Could not import PGP key. Key was not attached to mail nor a key was found on the keyserver")
-        else:
+        if pgp_key:
             import_pgp_key(pgp_key, sender_email)
+        else:
+            logger.info("Ticket does not have a PGP key attached. It is also not encrypted and/or PGP key was not found on a keysever")
+
     except (werkzeug.exceptions.BadRequest, KeyError) as e:
         logger.exception(e)
         error_counter += 1
@@ -132,7 +134,7 @@ def status() -> dict:
     if error_counter == 0:
         return {"status": "ok"}
     else:
-        return {"status": "fail"}
+        return {"status": "failed"}
 
 
 def main() -> None:
