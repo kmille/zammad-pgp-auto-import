@@ -46,7 +46,7 @@ def is_encrypted_mail(article_data: dict) -> bool:
         return False
 
     try:
-        return security["encryption"]["success"] is True
+        return security["encryption"].get("success", False) is True
     except KeyError as e:
         logger.error(f"Could not check if mail is PGP encrypted: {e}")
         logger.error(json.dumps(article_data, indent=4))
@@ -59,7 +59,7 @@ def get_pgp_key_from_attachments(article_data: dict) -> Optional[PGPKey]:
         logger.debug("This ticket does not have any attachments")
         return None
     for attachment in article_data["attachments"]:
-        if "application/pgp-keys" in attachment["preferences"]["Content-Type"]:
+        if "application/pgp-keys" in attachment["preferences"].get("Content-Type", ""):
             logger.debug("Seems like a PGP key is attached to this email")
             z = Zammad(ZAMMAD_BASE_URL, ZAMMAD_TOKEN)
             key_data = z.download_attachment(attachment["url"])
