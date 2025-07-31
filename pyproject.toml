@@ -1,6 +1,6 @@
 [project]
 name = "zammad-pgp-import"
-version = "0.1.1a3"
+version = "0.1.1a4"
 description = ""
 authors = [
     {name = "kmille",email = "github@androidloves.me"}
