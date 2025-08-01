@@ -1,5 +1,7 @@
 import logging
+import sys
 import json
+import argparse
 from typing import Optional
 from flask import Flask, request
 from flask_basicauth import BasicAuth
@@ -137,12 +139,44 @@ def status() -> dict:
         return {"status": "failed"}
 
 
-def main() -> None:
+def serve_backend() -> None:
     logger.info(f"Starting webhook backend on {LISTEN_HOST}:{LISTEN_PORT} (version {get_version()}, debug={DEBUG == '1'})")
     if __name__ == '__main__':
         app.run(host=LISTEN_HOST, port=LISTEN_PORT, debug=True)
     else:
         waitress.serve(app, listen=f"{LISTEN_HOST}:{LISTEN_PORT}")
+
+
+def cli_import_pgp_key(search_term: str) -> None:
+    # search can be key-id or email
+    try:
+        pgp_key = PGPHandler.search_pgp_key(search_term)
+        logger.info(f"Found key: {pgp_key}")
+        z = Zammad(ZAMMAD_BASE_URL, ZAMMAD_TOKEN)
+        z.import_pgp_key(pgp_key)
+        logger.info("Successfully imported PGP key")
+    except Exception as e:
+        logger.error(f"Could not import PGP key: {e}")
+
+
+def main() -> None:
+
+    desc = """Zammad webhook that automatically imports PGP keys.
+        There is also a cli to import PGP keys manually.
+        Configuration is done via environment variables.
+        Docs can be found here: https://github.com/kmille/zammad-pgp-auto-import"""
+    parser = argparse.ArgumentParser("zammad-pgp-import", description=desc)
+    parser.add_argument("--backend", "-b", action="store_true", help="run webhook backend")
+    parser.add_argument("--import-key", "-i", help="import pgp key by supplied email/key id")
+    parser.add_argument("--version", action="store_true", help="show version")
+    args = parser.parse_args()
+
+    if args.backend:
+        serve_backend()
+    elif args.import_key:
+        cli_import_pgp_key(args.import_key)
+    elif args.version:
+        print(f"{sys.argv[0]} {get_version()}")
 
 
 if __name__ == '__main__':
