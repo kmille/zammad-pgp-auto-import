@@ -66,7 +66,7 @@ class PGPHandler:
             return PGPKey(resp.text)
         except requests.exceptions.HTTPError as e:
             if e.response.status_code == 400:
-                logger.debug(f"API error message: {e.response.text}")
+                logger.debug(f"API error message: {e.response.text.strip()}")
                 raise NotFoundOnKeyserverError(f"Could not find a PGP key for {email} using keyserver {KEY_SERVER}")
             else:
                 raise PGPError(f"Could find PGP key on {KEY_SERVER}: {e.response.text}")
