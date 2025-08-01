@@ -66,6 +66,9 @@ def get_pgp_key_from_attachments(article_data: dict) -> Optional[PGPKey]:
             z = Zammad(ZAMMAD_BASE_URL, ZAMMAD_TOKEN)
             key_data = z.download_attachment(attachment["url"])
             return PGPKey(key_data)
+        else:
+            logger.debug(f"This attachment is not a PGP key: {attachment['preferences'].get('Content-Type', '')}")
+    logger.debug("No PGP key was attached to this email")
     return None
 
 
@@ -82,7 +85,7 @@ def import_pgp_key(pgp_key: PGPKey, sender_email: str) -> None:
         except ZammadPGPKeyAlreadyImportedError as e:
             logger.info(e)
         else:
-            logger.info(f"Successfully imported pgp key ({pgp_key.fingerprint}) for email {sender_email}")
+            logger.info(f"Successfully imported pgp key {pgp_key.fingerprint} for email {sender_email}")
 
 
 def get_key_from_keyserver(email: str) -> Optional[PGPKey]:
@@ -106,7 +109,9 @@ def webhook_new_ticket() -> tuple[dict[str, str], int]:
         is_encrypted = is_encrypted_mail(article_data)
         logger.info(f"Received a new Ticket: {ZAMMAD_BASE_URL}/#ticket/zoom/{data['ticket']['id']} (from={sender_email}, is_encrypted={is_encrypted})")
 
+        # always check if there is a PGP key attached to the mail
         pgp_key = get_pgp_key_from_attachments(article_data)
+        # if we don't have a pgp key at this point and the mail is encrypted, check if we can find one online
         if not pgp_key and is_encrypted:
             pgp_key = get_key_from_keyserver(sender_email)
         if pgp_key:
