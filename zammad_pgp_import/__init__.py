@@ -152,7 +152,7 @@ def serve_backend() -> None:
         waitress.serve(app, listen=f"{LISTEN_HOST}:{LISTEN_PORT}")
 
 
-def cli_import_pgp_key(search_term: str):
+def cli_import_pgp_key(search_term: str) -> None:
     # search can be key-id or email
     try:
         pgp_key = PGPHandler.search_pgp_key(search_term)
