@@ -31,4 +31,4 @@ requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.poetry.scripts]
-zammad-pgp-autoimport-webhook = 'zammad_pgp_import.__init__:main'
+zammad-pgp-import = 'zammad_pgp_import.__init__:main'

@@ -25,4 +25,4 @@ ENV DEBUG=0
 USER webhook
 EXPOSE 22000
 
-ENTRYPOINT ["/usr/local/bin/zammad-pgp-autoimport-webhook"]
+ENTRYPOINT ["/usr/local/bin/zammad-pgp-import", "--backend"]
