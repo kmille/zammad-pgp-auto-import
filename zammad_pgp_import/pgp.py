@@ -5,7 +5,7 @@ import subprocess
 # from datetime import datetime, date
 import requests
 
-from zammad_pgp_import.exceptions import PGPError, NotFoundOnKeyserverError
+from zammad_pgp_import.exceptions import PGPError, RateLimitError, NotFoundOnKeyserverError
 
 logger = logging.getLogger(__name__)
 
@@ -68,7 +68,10 @@ class PGPHandler:
             if e.response.status_code == 404:
                 logger.debug(f"API error message: {e.response.text.strip()}")
                 raise NotFoundOnKeyserverError(f"Could not find a PGP key for {email} using keyserver {KEY_SERVER}")
+            elif e.response.status_code == 429:
+                logger.debug(f"We got rate limited by the API: {e.response.text.strip()}")
+                raise RateLimitError(f"Could not find a PGP key for {email} using keyserver {KEY_SERVER}")
             else:
-                raise PGPError(f"Could find PGP key on {KEY_SERVER}: {e.response.text}")
+                raise PGPError(f"Could not find PGP key on {KEY_SERVER}: {e.response.text}")
         except requests.exceptions.RequestException as e:
             raise PGPError(f"Could not get PGP key: {e}")

@@ -1,6 +1,6 @@
 #from zammad_pgp_import.pgp import get_key_from_public_server, get_pgp_key_from_file, get_all_imported_pgp_keys
 from zammad_pgp_import.pgp import PGPKey, PGPHandler
-from zammad_pgp_import.exceptions import PGPError
+from zammad_pgp_import.exceptions import PGPError, NotFoundOnKeyserverError
 from pathlib import Path
 import pytest
 
@@ -30,5 +30,5 @@ class TestPGPHandler:
         assert key.fingerprint == test_key_fingerprint
 
     def test_search_invalid_pgp_key(self):
-        with pytest.raises(PGPError):
+        with pytest.raises(NotFoundOnKeyserverError):
             PGPHandler.search_pgp_key('nanana@noo.lol')

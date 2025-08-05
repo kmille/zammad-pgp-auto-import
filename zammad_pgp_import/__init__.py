@@ -9,9 +9,15 @@ import waitress
 import werkzeug
 
 from zammad_pgp_import.utils import get_version, load_envs
-from zammad_pgp_import.exceptions import PGPImportError, NotFoundOnKeyserverError, ZammadPGPKeyAlreadyImportedError
+from zammad_pgp_import.exceptions import PGPImportError, NotFoundOnKeyserverError, RateLimitError, ZammadPGPKeyAlreadyImportedError
 from zammad_pgp_import.zammad import Zammad
 from zammad_pgp_import.pgp import PGPHandler, PGPKey
+
+DESC = """Zammad webhook that automatically imports PGP keys.
+    There is also a cli to import PGP keys manually.
+    Configuration is done via environment variables.
+    Docs can be found here: https://github.com/kmille/zammad-pgp-auto-import"""
+
 
 LOG_FORMAT = "[%(asctime)s %(levelname)5s] %(message)s"
 logging.basicConfig(format=LOG_FORMAT,
@@ -62,12 +68,12 @@ def get_pgp_key_from_attachments(article_data: dict) -> Optional[PGPKey]:
         return None
     for attachment in article_data["attachments"]:
         if "application/pgp-keys" in attachment["preferences"].get("Content-Type", ""):
-            logger.debug("Seems like a PGP key is attached to this email")
+            logger.info("Seems like a PGP key is attached to this email")
             z = Zammad(ZAMMAD_BASE_URL, ZAMMAD_TOKEN)
             key_data = z.download_attachment(attachment["url"])
             return PGPKey(key_data)
         else:
-            logger.debug(f"This attachment is not a PGP key: {attachment['preferences'].get('Content-Type', '')}")
+            logger.debug(f"This attachment is not a PGP key (Content-Type='{attachment['preferences'].get('Content-Type', '')}')")
     logger.debug("No PGP key was attached to this email")
     return None
 
@@ -125,6 +131,7 @@ def webhook_new_ticket() -> tuple[dict[str, str], int]:
         return {"status": 'failed', 'reason': 'invalid client request'}, 500
     except PGPImportError as e:
         logger.error(e)
+        logger.exception(e)
         error_counter += 1
         return {"status": 'failed', 'reason': 'PGP/API error'}, 500
     except Exception as e:
@@ -152,36 +159,81 @@ def serve_backend() -> None:
         waitress.serve(app, listen=f"{LISTEN_HOST}:{LISTEN_PORT}")
 
 
-def cli_import_pgp_key(search_term: str) -> None:
+def find_and_import_pgp_key(search_term: str) -> None:
     # search can be key-id or email
+    pgp_key = PGPHandler.search_pgp_key(search_term)
+    logger.info(f"Found key: {pgp_key}")
+    z = Zammad(ZAMMAD_BASE_URL, ZAMMAD_TOKEN)
+    z.import_pgp_key(pgp_key)
+    logger.info("Successfully imported PGP key")
+
+
+def import_pgp_keys_from_thunderbird(db_file: str) -> None:
+    # https://keys.openpgp.org/about/api#rate-limiting
+    import sqlite3
+    from pathlib import Path
+    import time
+
+    db = Path(db_file).expanduser()
+    if not db.exists() or db.name != "global-messages-db.sqlite":
+        logger.error("Thunderbird db: File does not exist or file name is not 'global-messages-db.sqlite'")
+        sys.exit(1)
+
     try:
-        pgp_key = PGPHandler.search_pgp_key(search_term)
-        logger.info(f"Found key: {pgp_key}")
-        z = Zammad(ZAMMAD_BASE_URL, ZAMMAD_TOKEN)
-        z.import_pgp_key(pgp_key)
-        logger.info("Successfully imported PGP key")
+        con = sqlite3.connect(db_file)
+        cur = con.cursor()
+        res = cur.execute("SELECT value FROM identities WHERE kind = 'email'")
+
+        email_addresses = []
+        for row in res.fetchall():
+            email = row[0]
+            if email not in email_addresses:
+                email_addresses.append(email)
+            logger.debug(f"Read email: {email}")
     except Exception as e:
-        logger.error(f"Could not import PGP key: {e}")
+        logger.error(f"Could not read email addresses from Thunderbird db: {e}")
+        sys.exit(1)
+
+    logger.info(f"Read {len(email_addresses)} addresses")
+    for i, email in enumerate(email_addresses):
+        logger.info(f"Checking mail {i}/{len(email_addresses)}: {email}")
+        try:
+            find_and_import_pgp_key(email)
+            time.sleep(90)
+        except (NotFoundOnKeyserverError, ZammadPGPKeyAlreadyImportedError) as e:
+            logger.info(e)
+            time.sleep(90)
+        except (RateLimitError, Exception) as e:
+            logger.error(e)
+            logger.info(f"Got rate limited for {email}")
+            sys.exit(1)
 
 
 def main() -> None:
 
-    desc = """Zammad webhook that automatically imports PGP keys.
-        There is also a cli to import PGP keys manually.
-        Configuration is done via environment variables.
-        Docs can be found here: https://github.com/kmille/zammad-pgp-auto-import"""
-    parser = argparse.ArgumentParser("zammad-pgp-import", description=desc)
+    parser = argparse.ArgumentParser("zammad-pgp-import", description=DESC)
     parser.add_argument("--backend", "-b", action="store_true", help="run webhook backend")
     parser.add_argument("--import-key", "-i", help="import pgp key by supplied email/key id")
+    _help = """Needs a global-messages-db.sqlite file. Get all email addresses from global-messages-db.sqlite
+    (part of a Thunderbird profile). Try to find a PGP key and import it to Zammad.
+    As there is rate limiting, we sleep for a long time after each attempt. So you may want to run this on a server"""
+    parser.add_argument("--import-thunderbird", "-t", help=_help)
     parser.add_argument("--version", action="store_true", help="show version")
     args = parser.parse_args()
 
     if args.backend:
         serve_backend()
     elif args.import_key:
-        cli_import_pgp_key(args.import_key)
+        try:
+            find_and_import_pgp_key(args.import_key)
+        except Exception as e:
+            logger.error(f"Could not import PGP key: {e}")
+    elif args.import_thunderbird:
+        import_pgp_keys_from_thunderbird(args.import_thunderbird)
     elif args.version:
         print(f"{sys.argv[0]} {get_version()}")
+    else:
+        parser.print_help()
 
 
 if __name__ == '__main__':

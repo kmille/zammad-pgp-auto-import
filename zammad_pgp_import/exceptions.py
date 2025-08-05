@@ -11,6 +11,10 @@ class NotFoundOnKeyserverError(PGPImportError):
     pass
 
 
+class RateLimitError(PGPImportError):
+    pass
+
+
 class ZammadError(PGPImportError):
     pass
 
