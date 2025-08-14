@@ -42,7 +42,6 @@ class PGPKey(object):
             #     self.is_expired = datetime.now().date() > self.expires
 
         #  TODO: test if everything is set up
-        # breakpoint()
         # if not all([self.fingerprint, self.expires]):
         #     raise PGPError("Could not parse PGP key data")
         self.is_expired = False
@@ -65,7 +64,6 @@ class PGPHandler:
             resp.raise_for_status()
             return PGPKey(resp.text)
         except requests.exceptions.HTTPError as e:
-            breakpoint()
             if e.response.status_code in (400, 404):
                 logger.debug(f"API error message: {e.response.text.strip()}")
                 raise NotFoundOnKeyserverError(f"Could not find a PGP key for {email} using keyserver {KEY_SERVER}")
