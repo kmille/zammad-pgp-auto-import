@@ -199,13 +199,16 @@ def import_pgp_keys_from_thunderbird(db_file: str) -> None:
         logger.info(f"Checking mail {i}/{len(email_addresses)}: {email}")
         try:
             find_and_import_pgp_key(email)
-            time.sleep(90)
+            time.sleep(70)
         except (NotFoundOnKeyserverError, ZammadPGPKeyAlreadyImportedError) as e:
             logger.info(e)
-            time.sleep(90)
-        except (RateLimitError, Exception) as e:
+            time.sleep(70)
+        except RateLimitError as e:
+            logger.error(f"Got rate limited for {email}: {e}")
+            sys.exit(1)
+        except Exception as e:
+            logger.error(f"Got generic exception for email {email}")
             logger.error(e)
-            logger.info(f"Got rate limited for {email}")
             sys.exit(1)
 
 
@@ -213,7 +216,7 @@ def main() -> None:
 
     parser = argparse.ArgumentParser("zammad-pgp-import", description=DESC)
     parser.add_argument("--backend", "-b", action="store_true", help="run webhook backend")
-    parser.add_argument("--import-key", "-i", help="import pgp key by supplied email/key id")
+    parser.add_argument("--import-key", "-i", help="use key server to import pgp key by supplied email/key id")
     _help = """Needs a global-messages-db.sqlite file. Get all email addresses from global-messages-db.sqlite
     (part of a Thunderbird profile). Try to find a PGP key and import it to Zammad.
     As there is rate limiting, we sleep for a long time after each attempt. So you may want to run this on a server"""
