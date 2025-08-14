@@ -52,7 +52,7 @@ Configuration of this tool is done via environment variables.
 | ---------------------------- | ----------------------------------------------------------- | -------- |
 | DEBUG                        | set 1 to enable debug log                                   | no       |
 | ZAMMAD_BASE_URL              | url of zammad instance, like https://tickets.example.org    | yes      |
-| ZAMMAD_TOKEN                 | auth token with enough permissions                          | yes      |
+| ZAMMAD_TOKEN                 | auth token/api key with enough permissions (see below)      | yes      |
 | BASIC_AUTH_USER              | username for webhook and monitoring endpoint authentication | yes      |
 | BASIC_AUTH_PASSWORD          | password for webhook and monitoring endpoint authentication | yes      |
 | LISTEN_HOST                  | defaults to "127.0.0.1"                                     | no       |
@@ -69,11 +69,11 @@ Configuration of this tool is done via environment variables.
 
 ![](/docs/screenshot_trigger.png)
 
-To get an API for a production environment, I recommend:
+To get an API key for a production environment, I recommend:
 
 1) Create a new Zammad user, only used for the API
 2) Create a new role for the webhook user
-3) The webhook user needs to read tickets for all groups (to download ticket attachments) and the integration permission to import PGP keys
+3) The role needs permissions to read tickets for all groups (to download ticket attachments) and the integration permission (to import PGP keys)
 
 ### How to use it as a dev?
 
@@ -123,7 +123,7 @@ kmille@spring:~/projects/zammad-pgp-import# poetry run zammad-pgp-import --backe
 
 ...
 
-zammad-pgp-import-1  | [2025-08-04 12:08:46,377  INFO] Received a new Ticket: https://tickets.example.org/#ticket/zoom/133 (from=philippw@blueprintforfreespeech.net, is_encrypted=False)
+zammad-pgp-import-1  | [2025-08-04 12:08:46,377  INFO] Received a new Ticket: https://tickets.example.org/#ticket/zoom/133 (from=<redacted>, is_encrypted=False)
 zammad-pgp-import-1  | [2025-08-04 12:08:46,377 DEBUG] This attachment is not a PGP key (Content-Type='')                                                                                                                                      
 zammad-pgp-import-1  | [2025-08-04 12:08:46,377 DEBUG] No PGP key was attached to this email                                                                                                                                                   
 zammad-pgp-import-1  | [2025-08-04 12:08:46,377  INFO] Ticket does not have a PGP key attached. It is also not encrypted and/or PGP key was not found on a keysever                  
@@ -183,4 +183,4 @@ In case of at least one error, `{"status":"failed"}` is returned. Both responses
 - TODO: handle expired PGP keys (do not import them)
 - TODO: improve tests
 - Please check this Zammad PGP issue (was fixed, but it is not released yet I think): https://github.com/zammad/zammad/issues/5170
-- Right now, agents don't get PGP encrypted notifications, even if they have PGP key imported for that email address
+- Right now, agents don't get PGP encrypted notifications, even if they have a PGP key imported for that email address
