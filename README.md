@@ -77,12 +77,11 @@ To get an API key for a production environment, I recommend:
 
 ### How to use it as a dev?
 
-It's written in python and uses [poetry](https://python-poetry.org/) to manage dependencies.
+It's written in python and uses [uv](https://docs.astral.sh/uv/getting-started/installation/) to manage dependencies.
 
 ```bash
-poetry install
 source secrets.txt (see above)
-poetry run python zammad_pgp_import/__init__.py --help
+uv run zammad_pgp_import/__init__.py --help
 ```
 
 ### How to use it with Docker
@@ -117,7 +116,7 @@ services:
 1) Run the webhook backend
 
 ```bash
-kmille@spring:~/projects/zammad-pgp-import# poetry run zammad-pgp-import --backend
+kmille@spring:~/projects/zammad-pgp-import# uv run zammad-pgp-import --backend
 [2025-08-14 17:56:01,279  INFO] Starting webhook backend on 0.0.0.0:22000 (version 0.1.1a5, debug=True)
 [2025-08-14 17:56:01,281  INFO] Serving on http://0.0.0.0:22000
 
@@ -144,7 +143,7 @@ zammad-pgp-import-1  | [2025-08-05 13:24:07,126  INFO] Successfully imported pgp
 [2025-08-14 17:58:26,621  INFO] Found key: PGPKey (emails=jelle@vdwaa.nl,jelle@archlinux.org,jvanderwaa@redhat.com fingerprint=E499C79F53C96A54E572FEE1C06086337C50773E
 [2025-08-14 17:58:26,626 DEBUG] Importing PGP key using Zammad API
 [2025-08-14 17:58:26,789  INFO] Successfully imported PGP key
-kmille@spring:~/projects/zammad-pgp-import# poetry run zammad-pgp-import -i jelle@archlinux.org
+kmille@spring:~/projects/zammad-pgp-import# uv run zammad-pgp-import -i jelle@archlinux.org
 [2025-08-14 17:58:35,483  INFO] Found key: PGPKey (emails=jelle@vdwaa.nl,jelle@archlinux.org,jvanderwaa@redhat.com fingerprint=E499C79F53C96A54E572FEE1C06086337C50773E
 [2025-08-14 17:58:35,488 DEBUG] Importing PGP key using Zammad API
 [2025-08-14 17:58:35,598 ERROR] Could not import PGP key: Key was already imported. API response: Fingerprint There is already a PGP key with the same fingerprint.
@@ -153,7 +152,7 @@ kmille@spring:~/projects/zammad-pgp-import# poetry run zammad-pgp-import -i jell
 3. Import PGP keys from Thunderbird profile
 
 ```bash
-kmille@spring:~/projects/zammad-pgp-import# poetry run python zammad_pgp_import/__init__.py -t ~/.config/Thunderbird-LG/.thunderbird/....default-release/global-messages-db.sqlite                                                        
+kmille@spring:~/projects/zammad-pgp-import# uv run zammad_pgp_import/__init__.py -t ~/.config/Thunderbird-LG/.thunderbird/....default-release/global-messages-db.sqlite                                                        
 [2025-08-14 17:59:34,866 DEBUG] Read email: <redacted@bla.com>
 ...
 [2025-08-14 18:00:45,224  INFO] Checking mail 1/3460: <redacted @ ....>
