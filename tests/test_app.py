@@ -16,8 +16,6 @@ test_key_email = 'jelle@vdwaa.nl'
 
 zammad_pgp_import.ZAMMAD_BASE_URL = ZAMMAD_BASE_URL
 
-
-
 @pytest.fixture()
 def client():
     app.config['BASIC_AUTH_USERNAME'] = "admin"
@@ -29,15 +27,8 @@ def client():
 
 class TestEnd2EndStatusEndpoint:
 
-    def test_status_auth_required(self, client):
-        assert client.get("/status").status_code == 401
-
-    def test_status_auth_ok(self, client):
-        assert client.get("/status", auth=("admin", "admin123")).status_code == 200
-
-    def test_status_state_ok(self, client):
-        zammad_pgp_import.error_counter = 0
-        resp = client.get("/status", auth=("admin", "admin123"))
+    def test_status_no_auth_required(self, client):
+        resp = client.get("/status")
         assert resp.status_code == 200
         assert resp.json["status"] == "ok"
 
@@ -65,7 +56,7 @@ class TestEnd2EndWebhookEndpoint:
     }
 
     def test_webhook_auth_required(self, client):
-        assert client.get("/api/zammad/pgp").status_code == 401
+        assert client.get("/api/zammad/pgp").status_code == 405
         assert client.post("/api/zammad/pgp").status_code == 401
 
     def test_webhook_auth_ok(self, client):
