@@ -37,7 +37,6 @@ if DEBUG == "1":
 app = Flask(__name__)
 app.config['BASIC_AUTH_USERNAME'] = BASIC_AUTH_USER
 app.config['BASIC_AUTH_PASSWORD'] = BASIC_AUTH_PASSWORD
-app.config['BASIC_AUTH_FORCE'] = True  # protect all endpoints
 basic_auth = BasicAuth(app)
 
 error_counter = 0
@@ -105,6 +104,7 @@ def get_key_from_keyserver(email: str) -> Optional[PGPKey]:
 
 
 @app.route("/api/zammad/pgp", methods=["POST"])
+@basic_auth.required
 def webhook_new_ticket() -> tuple[dict[str, str], int]:
     global error_counter
     try:
