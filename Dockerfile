@@ -1,4 +1,4 @@
-FROM python:3.13-alpine3.22 AS builder
+FROM python:3.14-alpine3.23 AS builder
 RUN apk update
 RUN pip install poetry
 COPY . /app
@@ -6,7 +6,7 @@ WORKDIR /app
 RUN poetry build --format=wheel
 
 
-FROM python:3.13-alpine3.22
+FROM python:3.14-alpine3.23
 LABEL org.opencontainers.image.source=https://github.com/kmille/zammad-pgp-auto-import
 LABEL org.opencontainers.image.description="Zammad webhook that automatically imports PGP keys using Zammad's API"
 LABEL org.opencontainers.image.licenses=MIT
