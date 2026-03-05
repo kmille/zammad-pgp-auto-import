@@ -28,7 +28,7 @@ class PGPKey(object):
         except FileNotFoundError as e:
             raise PGPError(f"Could not find gpg binary: {e}")
         except subprocess.CalledProcessError as e:
-            logging.error(f"Content of the PGP key\n: {key_data}")
+            logging.error(f"Content of the PGP key:\n{key_data}")
             raise PGPError(f"Could not decode pgp key: {e.stderr.decode()}")
 
         for line in self.meta.splitlines():
