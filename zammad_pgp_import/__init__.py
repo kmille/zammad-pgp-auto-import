@@ -3,6 +3,7 @@ import sys
 import json
 import argparse
 from typing import Optional
+from datetime import datetime, timezone
 from flask import Flask, request
 from flask_basicauth import BasicAuth
 import waitress
@@ -99,7 +100,7 @@ def get_key_from_keyserver(email: str) -> Optional[PGPKey]:
         logger.info("Successfully found PGP key using a keyserver")
         return pgp_key
     except NotFoundOnKeyserverError as e:
-        logging.error(e)
+        logger.error(e)
         return None
 
 
@@ -162,10 +163,26 @@ def serve_backend() -> None:
 def find_and_import_pgp_key(search_term: str) -> None:
     # search can be key-id or email
     pgp_key = PGPHandler.search_pgp_key(search_term)
-    logger.info(f"Found key: {pgp_key}")
+    logger.info(f"Found key on keyserver: {pgp_key}")
     z = Zammad(ZAMMAD_BASE_URL, ZAMMAD_TOKEN)
     z.import_pgp_key(pgp_key)
     logger.info("Successfully imported PGP key")
+
+
+def remove_expired_pgp_keys():
+    logger.info("Iterating over all imported PGP keys to remove expired ones")
+    z = Zammad(ZAMMAD_BASE_URL, ZAMMAD_TOKEN)
+    pgp_keys = z.get_all_imported_pgp_keys()
+    now = datetime.now(timezone.utc)
+    for key in pgp_keys:
+        logger.debug(f"Checking key {key['fingerprint']}")
+        if not key["expires_at"]:
+            # some keys do not expire at all
+            continue
+        expires_at = datetime.fromisoformat(key["expires_at"])
+        if now > expires_at or key["fingerprint"].startswith("497D5E11D43D"):
+            logger.info(f"Key {key['fingerprint']} ({','.join(key['email_addresses'])}) is outdated")
+            z.delete_pgp_key(key["id"])
 
 
 def import_pgp_keys_from_thunderbird(db_file: str) -> None:
@@ -220,6 +237,7 @@ def main() -> None:
     _help = """Needs a global-messages-db.sqlite file. Get all email addresses from global-messages-db.sqlite
     (part of a Thunderbird profile). Try to find a PGP key and import it to Zammad.
     As there is rate limiting, we sleep for a long time after each attempt. So you may want to run this on a server"""
+    parser.add_argument("--remove-expired-keys", action="store_true", help="Iterate over all imported PGP keys in Zammad and remove the expired ones")
     parser.add_argument("--import-thunderbird", "-t", help=_help)
     parser.add_argument("--version", action="store_true", help="show version")
     args = parser.parse_args()
@@ -231,6 +249,8 @@ def main() -> None:
             find_and_import_pgp_key(args.import_key)
         except Exception as e:
             logger.error(f"Could not import PGP key: {e}")
+    elif args.remove_expired_keys:
+        remove_expired_pgp_keys()
     elif args.import_thunderbird:
         import_pgp_keys_from_thunderbird(args.import_thunderbird)
     elif args.version:

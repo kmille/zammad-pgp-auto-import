@@ -61,16 +61,11 @@ class Zammad(object):
                 raise ZammadError(f"Could not import PGP key: {e.response.json()['error_human']}")
             raise ZammadError(f"Could not import PGP key: {e}")
 
-    def delete_pgp_key(self, email: str) -> None:
-        logger.debug("Deleting PGP key using Zammad API")
+    def delete_pgp_key(self, key_id: int) -> None:
+        logger.debug(f"Deleting PGP key with key id {key_id} using Zammad API")
         try:
-            all_imported_keys = self.get_all_imported_pgp_keys()
-            matching_keys = list(filter(lambda x: x['email_addresses'][0].lower() == email.lower(), all_imported_keys))
-            if len(matching_keys) == 0:
-                logger.warning(f"Could find a PGP key with e-mail {email}")
-            else:
-                resp = self.session.delete(self.base_url + f"/api/v1/integration/pgp/key/{matching_keys[0]['id']}")
-                resp.raise_for_status()
-                logger.info("Successfully deleted PGP in Zammad")
+            resp = self.session.delete(self.base_url + f"/api/v1/integration/pgp/key/{key_id}")
+            resp.raise_for_status()
+            logger.info("Successfully deleted PGP in Zammad")
         except requests.exceptions.RequestException as e:
-            logger.warning(f"Could not delete PGP key in Zammad: {e}")
+            logger.error(f"Could not delete PGP key in Zammad: {e}")
