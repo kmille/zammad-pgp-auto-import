@@ -26,22 +26,29 @@ export BASIC_AUTH_PASSWORD="test"
 export LISTEN_HOST="0.0.0.0"
 export LISTEN_PORT="22000"
 
-source secrets.source
+kmille@spring:~/projects/zammad-pgp-import# uv run zammad-pgp-import -h
+usage: zammad-pgp-import [-h] [--backend] [--import-key IMPORT_KEY] [--remove-expired-keys] [--run-webhook-for-ticket RUN_WEBHOOK_FOR_TICKET]
+                         [--check-all-tickets] [--import-thunderbird IMPORT_THUNDERBIRD] [--version]
 
-zammad-pgp-import -h
-usage: zammad-pgp-import [-h] [--backend] [--import-key IMPORT_KEY] [--import-thunderbird IMPORT_THUNDERBIRD] [--version]
-
-Zammad webhook that automatically imports PGP keys. There is also a cli to import PGP keys manually. Configuration is done via environment variables. Docs can be found here: https://github.com/kmille/zammad-pgp-auto-import
+Zammad webhook that automatically imports PGP keys. There is also a cli to import PGP keys manually. Configuration is done via environment variables. Docs     
+can be found here: https://github.com/kmille/zammad-pgp-auto-import
 
 options:
   -h, --help            show this help message and exit
   --backend, -b         run webhook backend
   --import-key, -i IMPORT_KEY
                         use key server to import pgp key by supplied email/key id
+  --remove-expired-keys
+                        Iterate over all imported PGP keys in Zammad and remove the expired ones
+  --run-webhook-for-ticket RUN_WEBHOOK_FOR_TICKET
+                        Run webhook for a specific ticket. Needs the ticket id
+  --check-all-tickets   Iterate over all tickets and run webhook for each ticket
   --import-thunderbird, -t IMPORT_THUNDERBIRD
-                        Needs a global-messages-db.sqlite file. Get all email addresses from global-messages-db.sqlite (part of a Thunderbird profile). Try to find a PGP key and import it to Zammad. As there is rate limiting, we sleep
-                        for a long time after each attempt. So you may want to run this on a server
+                        Needs a global-messages-db.sqlite file. Get all email addresses from global-messages-db.sqlite (part of a Thunderbird profile). Try    
+                        to find a PGP key and import it to Zammad. As there is rate limiting, we sleep for a long time after each attempt. So you may want to  
+                        run this on a server
   --version             show version
+
 ```
 
 ### Configuration
@@ -175,7 +182,7 @@ Enter host password for user 'webhook':
 {"status":"ok"}
 ```
 
-In case of at least one error, `{"status":"failed"}` is returned. Both responses use status code 200. The authentication credentials are the same like the ones for the webhook endpoint. In case of an error, check the logs and restart the webhook.
+In case of at least one error, `{"status":"failed"}` is returned. Both responses use status code 200. ~~The authentication credentials are the same like the ones for the webhook endpoint~~ (no credentials are required any more). In case of an error, check the logs and restart the webhook.
 
 ### KNOWN ISSUES/TODOs
 
