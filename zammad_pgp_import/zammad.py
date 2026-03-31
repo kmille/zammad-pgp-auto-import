@@ -25,16 +25,80 @@ class Zammad(object):
         """
         logger.debug("Getting all imported PGP keys using Zammad API")
         try:
-            req = self.session.get(self.base_url + "/api/v1/integration/pgp/key")
-            req.raise_for_status()
-            return req.json()
+            resp = self.session.get(self.base_url + "/api/v1/integration/pgp/key")
+            resp.raise_for_status()
+            return resp.json()
         except requests.exceptions.RequestException as e:
             raise ZammadError(f"Could not get all imported PGP keys from Zammad: {e}")
 
-    def download_attachment(self, url: str) -> str:
+    def get_tickets(self) -> dict:
+        logger.debug("Getting all tickets using Zammad API")
+        tickets = []
+        page_index = 1
+        while True:
+            try:
+                params = {
+                    "per_page": 100,
+                    "page": page_index,
+                }
+                resp = self.session.get(self.base_url + "/api/v1/tickets/", params=params)
+                resp.raise_for_status()
+                len_results = len(resp.json())
+                logger.debug(f"Got {len_results} tickets for page {page_index}")
+                tickets.extend(resp.json())
+                if len_results == 0:
+                    logger.debug(f"Successfully got {len(tickets)} tickets via Zammad API")
+                    return tickets
+                page_index += 1
+            except requests.exceptions.RequestException as e:
+                if isinstance(e, requests.exceptions.HTTPError):
+                    logger.error(f"Zammad API error: {e}")
+                    raise ZammadError(f"Could not get tickets from Zammad: {e.response.json()['error_human']}")
+                raise ZammadError(f"Could not get tickets from Zammad: {e}")
+
+    def get_ticket(self, ticket_id: int):
+        logger.debug(f"Getting ticket {ticket_id} using Zammad API")
+        try:
+            resp = self.session.get(self.base_url + f"/api/v1/tickets/{ticket_id}")
+            resp.raise_for_status()
+            logger.debug("Successfully got ticket via Zammad API")
+            return resp.json()
+        except requests.exceptions.RequestException as e:
+            if isinstance(e, requests.exceptions.HTTPError):
+                logger.error(f"Zammad API error: {e}")
+                raise ZammadError(f"Could not get ticket from Zammad: {e.response.json()['error_human']}")
+            raise ZammadError(f"Could not get ticket from Zammad: {e}")
+
+    def get_ticket_articles(self, ticket_id: int):
+        logger.debug(f"Getting ticket articles of ticket {ticket_id} using Zammad API")
+        try:
+            resp = self.session.get(self.base_url + f"/api/v1/ticket_articles/by_ticket/{ticket_id}")
+            resp.raise_for_status()
+            logger.debug("Successfully got ticket articles via Zammad API")
+            return resp.json()
+        except requests.exceptions.RequestException as e:
+            if isinstance(e, requests.exceptions.HTTPError):
+                logger.error(f"Zammad API error: {e}")
+                raise ZammadError(f"Could not get ticket articles from Zammad: {e.response.json()['error_human']}")
+            raise ZammadError(f"Could not get ticket articles from Zammad: {e}")
+
+    def get_user(self, user_id: int):
+        logger.debug(f"Getting user {user_id} using Zammad API")
+        try:
+            resp = self.session.get(self.base_url + f"/api/v1/users/{user_id}")
+            resp.raise_for_status()
+            logger.debug("Successfully got user via Zammad API")
+            return resp.json()
+        except requests.exceptions.RequestException as e:
+            if isinstance(e, requests.exceptions.HTTPError):
+                logger.error(f"Zammad API error: {e}")
+                raise ZammadError(f"Could not get user from Zammad: {e.response.json()['error_human']}")
+            raise ZammadError(f"Could not get user from Zammad: {e}")
+
+    def download_attachment(self, ticket_id: int, article_id: int, attachment_id: int) -> str:
         logger.debug("Downloading ticket attachment using Zammad API")
         try:
-            resp = self.session.get(url)
+            resp = self.session.get(self.base_url + f"/api/v1/ticket_attachment/{ticket_id}/{article_id}/{attachment_id}")
             resp.raise_for_status()
             logger.debug("Successfully downloaded email attachment")
             return resp.text
@@ -54,11 +118,11 @@ class Zammad(object):
             resp.raise_for_status()
         except requests.exceptions.RequestException as e:
             if isinstance(e, requests.exceptions.HTTPError) and e.response.status_code == 422:
-                raise ZammadPGPKeyAlreadyImportedError(f"Key was already imported. API response: {e.response.json()['error_human']}")
+                raise ZammadPGPKeyAlreadyImportedError(f"Key was already imported. API response: '{e.response.json()['error_human']}'")
             elif isinstance(e, requests.exceptions.HTTPError):
                 logger.error(f"Zammad API error: {e}")
                 logger.error(f"Request json:\n{json.dumps(data, indent=4)}")
-                raise ZammadError(f"Could not import PGP key: {e.response.json()['error_human']}")
+                raise ZammadError(f"Could not import PGP key: '{e.response.json()['error_human']}'")
             raise ZammadError(f"Could not import PGP key: {e}")
 
     def delete_pgp_key(self, key_id: int) -> None:

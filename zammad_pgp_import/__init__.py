@@ -70,7 +70,7 @@ def get_pgp_key_from_attachments(article_data: dict) -> Optional[PGPKey]:
         if "application/pgp-keys" in attachment["preferences"].get("Content-Type", ""):
             logger.info("Seems like a PGP key is attached to this email")
             z = Zammad(ZAMMAD_BASE_URL, ZAMMAD_TOKEN)
-            key_data = z.download_attachment(attachment["url"])
+            key_data = z.download_attachment(article_data["ticket_id"], article_data["id"], attachment["id"])
             return PGPKey(key_data)
         else:
             logger.debug(f"This attachment is not a PGP key (Content-Type='{attachment['preferences'].get('Content-Type', '')}')")
@@ -80,7 +80,7 @@ def get_pgp_key_from_attachments(article_data: dict) -> Optional[PGPKey]:
 
 def import_pgp_key(pgp_key: PGPKey, sender_email: str) -> None:
     if not pgp_key.has_email(sender_email):
-        logger.warning(f"E-Mail contains a PGP not matching with senders email ({sender_email}, {pgp_key})")
+        logger.warning(f"E-Mail contains a PGP key not matching with senders email ({sender_email}, {pgp_key})")
     elif pgp_key.is_expired:
         pass
         # logger.warning(f"PGP key is already expired. Not importing it ({pgp_key.expires})")
@@ -104,28 +104,31 @@ def get_key_from_keyserver(email: str) -> Optional[PGPKey]:
         return None
 
 
+def run_webhok_for_ticket(ticket_id: int, sender_email: str, article_data: dict) -> None:
+    ticket_url = f"{ZAMMAD_BASE_URL}/#ticket/zoom/{ticket_id}"
+    is_encrypted = is_encrypted_mail(article_data)
+    logger.info(f"Running webhook for ticket: {ticket_url} (from={sender_email}, is_encrypted={is_encrypted})")
+
+    # always check if there is a PGP key attached to the mail
+    pgp_key = get_pgp_key_from_attachments(article_data)
+    # if we don't have a pgp key at this point and the mail is encrypted, check if we can find one online
+    if not pgp_key and is_encrypted:
+        pgp_key = get_key_from_keyserver(sender_email)
+    if pgp_key:
+        import_pgp_key(pgp_key, sender_email)
+    else:
+        logger.info("Ticket does not have a PGP key attached. It is also not encrypted and/or PGP key was not found on a keysever")
+
+
 @app.route("/api/zammad/pgp", methods=["POST"])
 @basic_auth.required
 def webhook_new_ticket() -> tuple[dict[str, str], int]:
     global error_counter
     try:
-        data = request.get_json(force=True)
-        sender_email = data["ticket"]["created_by"]["email"]
-        article_data = data['article']
-
-        is_encrypted = is_encrypted_mail(article_data)
-        logger.info(f"Received a new Ticket: {ZAMMAD_BASE_URL}/#ticket/zoom/{data['ticket']['id']} (from={sender_email}, is_encrypted={is_encrypted})")
-
-        # always check if there is a PGP key attached to the mail
-        pgp_key = get_pgp_key_from_attachments(article_data)
-        # if we don't have a pgp key at this point and the mail is encrypted, check if we can find one online
-        if not pgp_key and is_encrypted:
-            pgp_key = get_key_from_keyserver(sender_email)
-        if pgp_key:
-            import_pgp_key(pgp_key, sender_email)
-        else:
-            logger.info("Ticket does not have a PGP key attached. It is also not encrypted and/or PGP key was not found on a keysever")
-
+        ticket_data = request.get_json(force=True)
+        sender_email = ticket_data["ticket"]["created_by"]["email"]
+        article_data = ticket_data['article']
+        run_webhok_for_ticket(ticket_data['ticket']['id'], sender_email, article_data)
     except (werkzeug.exceptions.BadRequest, KeyError) as e:
         logger.exception(e)
         error_counter += 1
@@ -229,8 +232,26 @@ def import_pgp_keys_from_thunderbird(db_file: str) -> None:
             sys.exit(1)
 
 
-def main() -> None:
+def run_webhook_for_ticket(ticket_id: int):
+    logging.info(f"Getting all data before running webhook for ticket {ticket_id}")
+    z = Zammad(ZAMMAD_BASE_URL, ZAMMAD_TOKEN)
+    ticket_data = z.get_ticket(ticket_id)
+    customer_id = ticket_data["customer_id"]
+    user = z.get_user(customer_id)
+    email = user["email"]
+    articles = z.get_ticket_articles(ticket_id)
+    run_webhok_for_ticket(ticket_id, email, articles[0])
 
+
+def check_all_tickets():
+    logging.info("Checking all tickets")
+    z = Zammad(ZAMMAD_BASE_URL, ZAMMAD_TOKEN)
+    tickets = z.get_tickets()
+    for ticket in tickets:
+        run_webhook_for_ticket(ticket["id"])
+
+
+def main() -> None:
     parser = argparse.ArgumentParser("zammad-pgp-import", description=DESC)
     parser.add_argument("--backend", "-b", action="store_true", help="run webhook backend")
     parser.add_argument("--import-key", "-i", help="use key server to import pgp key by supplied email/key id")
@@ -238,6 +259,8 @@ def main() -> None:
     (part of a Thunderbird profile). Try to find a PGP key and import it to Zammad.
     As there is rate limiting, we sleep for a long time after each attempt. So you may want to run this on a server"""
     parser.add_argument("--remove-expired-keys", action="store_true", help="Iterate over all imported PGP keys in Zammad and remove the expired ones")
+    parser.add_argument("--run-webhook-for-ticket", help="Run webhook for a specific ticket. Needs the ticket id")
+    parser.add_argument("--check-all-tickets", action="store_true", help="Iterate over all tickets and run webhook for each ticket")
     parser.add_argument("--import-thunderbird", "-t", help=_help)
     parser.add_argument("--version", action="store_true", help="show version")
     args = parser.parse_args()
@@ -253,6 +276,11 @@ def main() -> None:
         remove_expired_pgp_keys()
     elif args.import_thunderbird:
         import_pgp_keys_from_thunderbird(args.import_thunderbird)
+    elif args.run_webhook_for_ticket:
+        ticket_id = args.run_webhook_for_ticket
+        run_webhook_for_ticket(ticket_id)
+    elif args.check_all_tickets:
+        check_all_tickets()
     elif args.version:
         print(f"{sys.argv[0]} {get_version()}")
     else:
