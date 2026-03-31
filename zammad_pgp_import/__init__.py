@@ -180,7 +180,7 @@ def remove_expired_pgp_keys():
             # some keys do not expire at all
             continue
         expires_at = datetime.fromisoformat(key["expires_at"])
-        if now > expires_at or key["fingerprint"].startswith("497D5E11D43D"):
+        if now > expires_at:
             logger.info(f"Key {key['fingerprint']} ({','.join(key['email_addresses'])}) is outdated")
             z.delete_pgp_key(key["id"])
 
