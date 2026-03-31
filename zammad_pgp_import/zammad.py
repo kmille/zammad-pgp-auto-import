@@ -46,11 +46,11 @@ class Zammad(object):
 
     def import_pgp_key(self, pgp_key: PGPKey) -> None:
         logger.debug("Importing PGP key using Zammad API")
-        data = {'file': '',
-                'key': pgp_key.raw,
+        data = {'file': pgp_key.raw,
+                'key': "",
                 'passphrase': ""}
         try:
-            resp = self.session.post(self.base_url + "/api/v1/integration/pgp/key", json=data)
+            resp = self.session.post(self.base_url + "/api/v1/integration/pgp/key", files=data)
             resp.raise_for_status()
         except requests.exceptions.RequestException as e:
             if isinstance(e, requests.exceptions.HTTPError) and e.response.status_code == 422:
