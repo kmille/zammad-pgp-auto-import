@@ -47,7 +47,7 @@ class PGPKey(object):
         self.is_expired = False
 
     def has_email(self, email: str) -> bool:
-        return email in self.emails
+        return any(e.lower() == email.lower() for e in self.emails)
 
     def __repr__(self) -> str:
         # return f"PGPKey (emails={','.join(self.emails)} fingerprint={self.fingerprint}, expires={self.expires}))"
