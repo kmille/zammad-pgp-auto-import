@@ -1,7 +1,8 @@
 [project]
 name = "zammad-pgp-import"
 version = "0.4.0"
-description = ""
+description = "Zammad webhook that automatically imports PGP keys using Zammad's API"
+repository = "https://github.com/kmille/zammad-pgp-auto-import"
 authors = [
     {name = "kmille",email = "github@androidloves.me"}
 ]
